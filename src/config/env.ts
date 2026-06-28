@@ -1,17 +1,33 @@
+import fs from "fs";
 import dotenv from "dotenv";
 
-dotenv.config();
+// Load .env if present. This is safe to call in production since dotenv
+// won't overwrite already-set environment variables.
+dotenv.config({ path: process.env.DOTENV_PATH ?? ".env" });
 
 const MIN_SECRET_LENGTH = 32;
 
-function requiredEnv(name: string): string {
-  const value = process.env[name];
+function readFromFileFallback(name: string): string | undefined {
+  const filePath = process.env[`${name}_FILE`];
+  if (!filePath) return undefined;
 
-  if (!value) {
-    throw new Error(`Environment variable ${name} is required but was not found.`);
+  try {
+    const content = fs.readFileSync(filePath, "utf8").trim();
+    return content || undefined;
+  } catch (err) {
+    // If the file can't be read, surface a helpful error later where used.
+    return undefined;
   }
+}
 
-  return value.trim();
+function requiredEnv(name: string): string {
+  const fromEnv = process.env[name];
+  if (fromEnv && fromEnv.trim() !== "") return fromEnv.trim();
+
+  const fromFile = readFromFileFallback(name);
+  if (fromFile) return fromFile;
+
+  throw new Error(`Environment variable ${name} is required but was not found.`);
 }
 
 function requiredSecret(name: string): string {
@@ -57,15 +73,15 @@ function parsePort(rawValue: string | undefined, fallback: number): number {
   }
 
   const port = Number(rawValue);
-  if (!Number.isFinite(port) || port <= 0 || Number.isNaN(port)) {
-    throw new Error(`Environment variable PORT must be a valid positive number. Received: ${rawValue}`);
+  if (!Number.isFinite(port) || port <= 0 || port > 65535 || Number.isNaN(port) || !Number.isInteger(port)) {
+    throw new Error(`Environment variable PORT must be a valid positive integer between 1 and 65535. Received: ${rawValue}`);
   }
 
   return port;
 }
 
 function loadFrontendUrl(): string {
-  const frontendUrl = process.env.FRONTEND_URL?.trim();
+  const frontendUrl = process.env.FRONTEND_URL?.trim() ?? readFromFileFallback("FRONTEND_URL");
 
   if (frontendUrl) {
     return frontendUrl;
@@ -79,7 +95,7 @@ function loadFrontendUrl(): string {
 }
 
 export const env = {
-  nodeEnv: process.env.NODE_ENV ?? "development",
+  nodeEnv: (process.env.NODE_ENV ?? "development").trim(),
   port: parsePort(process.env.PORT, 3000),
   databaseUrl: requiredEnv("DATABASE_URL"),
   jwtSecret: requiredSecret("JWT_SECRET"),
