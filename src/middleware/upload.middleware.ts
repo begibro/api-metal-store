@@ -3,12 +3,17 @@ import fs from "fs";
 import path from "path";
 
 const uploadDir = path.join(process.cwd(), "uploads");
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
+
+function ensureUploadDir(callback: (error: NodeJS.ErrnoException | null) => void) {
+  fs.mkdir(uploadDir, { recursive: true }, callback);
 }
 
 const storage = multer.diskStorage({
-  destination: uploadDir,
+  destination: (_req, _file, cb) => {
+    ensureUploadDir((error) => {
+      cb(error, uploadDir);
+    });
+  },
   filename: (_req, file, cb) => {
     const timestamp = Date.now();
     const safeName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, "_");
