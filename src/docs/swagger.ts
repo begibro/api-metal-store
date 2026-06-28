@@ -1,4 +1,4 @@
-import { env } from "../config/index.js";
+const swaggerServerUrl = process.env.SWAGGER_SERVER_URL ?? "/";
 
 const swaggerDocument = {
   openapi: "3.0.0",
@@ -9,8 +9,8 @@ const swaggerDocument = {
   },
   servers: [
     {
-      url: `http://localhost:${env.port}`,
-      description: "Local development server",
+      url: swaggerServerUrl,
+      description: "API server",
     },
   ],
   components: {
